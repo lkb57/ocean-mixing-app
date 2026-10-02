@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ocean Mixing δ18O Explorer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111d;
+      --surface: #0d1b2b;
+      --surface-2: #12263a;
+      --surface-3: #172f46;
+      --text: #edf7ff;
+      --muted: #a6c0d5;
+      --faint: #6f8aa1;
+      --line: #28465e;
+      --cyan: #62d7e6;
+      --orange: #ffb86b;
+      --purple: #c7a8ff;
+      --pink: #ff8fb1;
+      --green: #76e3b3;
+      --yellow: #f7de76;
+      --shadow: 0 18px 50px rgba(0, 0, 0, .28);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        radial-gradient(circle at 80% -10%, rgba(53, 121, 158, .25), transparent 38rem),
+        linear-gradient(160deg, #07111d 0%, #091827 58%, #06101b 100%);
+      color: var(--text);
+      font: 400 15px/1.45 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    .app { max-width: 1440px; margin: 0 auto; padding: 32px 28px 42px; }
+    header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 26px; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: clamp(26px, 4vw, 42px); line-height: 1.05; letter-spacing: -.03em; font-weight: 500; }
+    .subtitle { color: var(--muted); margin-top: 9px; max-width: 760px; }
+    .badge { border: 1px solid rgba(118, 227, 179, .34); color: var(--green); background: rgba(118, 227, 179, .09); padding: 7px 11px; border-radius: 999px; white-space: nowrap; font-size: 12px; }
+
+    .layout { display: grid; grid-template-columns: minmax(290px, 360px) minmax(0, 1fr); gap: 22px; align-items: start; }
+    .controls, .chart-shell, .table-shell { background: rgba(13, 27, 43, .88); border: 1px solid rgba(114, 160, 190, .22); box-shadow: var(--shadow); border-radius: 18px; }
+    .controls { padding: 20px; }
+    .controls h2, .chart-shell h2, .table-shell h2 { font-size: 15px; font-weight: 500; letter-spacing: .02em; }
+    .controls > p { color: var(--muted); font-size: 13px; margin-top: 5px; }
+    .reset-button { margin-top: 13px; padding: 8px 11px; border: 1px solid rgba(98, 215, 230, .35); border-radius: 8px; color: var(--text); background: rgba(98, 215, 230, .1); font: inherit; font-size: 12px; cursor: pointer; }
+    .reset-button:hover, .reset-button:focus-visible { background: rgba(98, 215, 230, .2); outline: 2px solid var(--cyan); outline-offset: 2px; }
+    fieldset { border: 0; padding: 0; margin: 21px 0 0; }
+    .control-section { margin: 21px 0 0; }
+    .control-section > summary { list-style: none; cursor: pointer; color: var(--cyan); font-size: 12px; text-transform: uppercase; letter-spacing: .11em; }
+    .control-section > summary::-webkit-details-marker { display: none; }
+    .control-section > summary::before { content: '▸'; display: inline-block; margin-right: 7px; color: var(--muted); transform: rotate(0deg); transition: transform .16s ease; }
+    .control-section[open] > summary::before { transform: rotate(90deg); }
+    legend { width: 100%; color: var(--cyan); font-size: 12px; text-transform: uppercase; letter-spacing: .11em; margin-bottom: 12px; }
+    .control { padding: 13px 0 15px; border-top: 1px solid rgba(114, 160, 190, .16); }
+    .control:first-of-type { border-top: 0; padding-top: 0; }
+    .control-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 8px; }
+    .control-label { font-weight: 500; }
+    .control-help { color: var(--faint); font-size: 11px; margin-top: 5px; }
+    output { color: var(--text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .input-line { display: grid; grid-template-columns: minmax(0, 1fr) 78px; gap: 10px; align-items: center; }
+    .range-endpoints { display: flex; justify-content: space-between; gap: 12px; color: var(--faint); font-size: 11px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    input[type="range"] { width: 100%; accent-color: var(--cyan); }
+    input[type="number"] { width: 100%; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; font: inherit; font-variant-numeric: tabular-nums; }
+    input[type="number"]:focus, input[type="range"]:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+    .chart-shell { padding: 20px 20px 14px; min-width: 0; }
+    .chart-head { display: flex; justify-content: space-between; align-items: start; gap: 18px; margin-bottom: 3px; }
+    .chart-head p { color: var(--muted); font-size: 13px; margin-top: 5px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; justify-content: flex-end; color: var(--muted); font-size: 12px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .dot { width: 9px; height: 9px; display: inline-block; border-radius: 50%; }
+    .dot.input { background: var(--cyan); }
+    .dot.derived { background: var(--orange); }
+    .dot.mix { background: var(--purple); }
+    .dot.surface { background: var(--pink); }
+    .dot.wis { background: var(--yellow); }
+    .axis-controls { border: 0; padding: 0; margin: 16px 0 4px; }
+    .axis-controls legend { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 8px; }
+    .axis-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 14px; }
+    .axis-control { min-width: 0; }
+    .axis-control .control-head { margin-bottom: 5px; }
+    .axis-control .control-label { color: var(--muted); font-size: 12px; }
+    .axis-control input[type="number"] { width: 72px; padding: 5px 6px; font-size: 12px; }
+    .axis-control .input-line { grid-template-columns: minmax(0, 1fr) 72px; gap: 7px; }
+    .axis-control .range-endpoints { font-size: 10px; }
+    .plot-wrap { position: relative; margin-top: 10px; }
+    svg { display: block; width: 100%; height: auto; overflow: visible; }
+    .chart-grid { stroke: rgba(166, 192, 213, .15); stroke-width: 1; }
+    .chart-axis { stroke: var(--line); stroke-width: 1.2; }
+    .chart-tick { fill: var(--muted); font-size: 12px; }
+    .chart-label { fill: var(--text); font-size: 13px; }
+    .chart-axis-title { fill: var(--muted); font-size: 13px; }
+    .reference-line { stroke: #ffffff; stroke-width: 2; opacity: .95; }
+    .point { stroke: var(--bg); stroke-width: 2.5; cursor: pointer; transition: r .16s ease, stroke-width .16s ease; }
+    .point:hover, .point:focus { stroke: var(--text); stroke-width: 3.5; outline: none; }
+    .point.input { fill: var(--cyan); }
+    .point.derived { fill: var(--orange); }
+    .point.mix { fill: var(--purple); }
+    .point.surface { fill: var(--pink); }
+    .point.wis { fill: var(--yellow); }
+    .region-label { fill: var(--text); font-size: 12px; font-weight: 500; pointer-events: none; }
+    .plot-note { color: var(--muted); font-size: 12px; margin: 4px 4px 0; }
+    .selection { margin-top: 12px; color: var(--muted); font-size: 13px; min-height: 21px; }
+    .selection strong { color: var(--text); }
+    .marker-controls { margin-top: 13px; padding-top: 12px; border-top: 1px solid rgba(114, 160, 190, .16); }
+    .marker-controls legend { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 8px; }
+    .marker-options { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+    .marker-option { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+    .marker-option input { accent-color: var(--cyan); }
+    .table-shell { grid-column: 1 / -1; padding: 18px 20px 12px; }
+    .table-shell h2 { margin-bottom: 10px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 680px; }
+    th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid rgba(114, 160, 190, .14); }
+    th { color: var(--muted); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; }
+    td { font-variant-numeric: tabular-nums; }
+    td.num { text-align: right; }
+    .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: 1px; }
+    .method { color: var(--muted); font-size: 12px; padding-top: 12px; }
+    .tooltip { position: absolute; z-index: 2; display: none; min-width: 190px; pointer-events: none; background: #102338; color: var(--text); border: 1px solid rgba(114, 160, 190, .35); border-radius: 10px; box-shadow: var(--shadow); padding: 10px 12px; font-size: 12px; }
+    .tooltip.visible { display: block; }
+    .tooltip strong { display: block; margin-bottom: 3px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 22px; }
+      .controls > h2, .controls > p { grid-column: 1 / -1; }
+      .controls fieldset, .controls .control-section { margin-top: 18px; }
+      .table-shell { grid-column: auto; }
+    }
+    @media (max-width: 620px) {
+      .app { padding: 22px 14px 30px; }
+      header { align-items: flex-start; flex-direction: column; gap: 14px; }
+      .controls { display: block; }
+      .chart-shell { padding: 16px 12px 12px; }
+      .chart-head { display: block; }
+      .legend { justify-content: flex-start; margin-top: 10px; }
+      .region-label { font-size: 11px; }
+    }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="app" id="ocean-mixing-app">
+    <header>
+      <div>
+        <h1>Ocean mixing δ¹⁸O explorer</h1>
+        <p class="subtitle">A conceptual salinity–δ¹⁸O model for tracing how surface effects and deep-water mixing shape ocean regions.</p>
+      </div>
+      <div class="badge">Dark mode · live model</div>
+    </header>
+
+    <div class="layout">
+      <section class="controls" aria-labelledby="controls-title">
+        <h2 id="controls-title">Adjust the endmembers</h2>
+        <button id="reset-defaults" class="reset-button" type="button">Reset to default values</button>
+        <p>Move a slider or enter a value. Derived regions update immediately.</p>
+
+        <details class="control-section" open>
+          <summary>Input waters</summary>
+
+          <div class="control">
+            <div class="control-head"><label class="control-label" for="adw-freeze-range">ADW freezing / brine rejection</label><output id="adw-freeze-output" for="adw-freeze-range">0.00‰</output></div>
+            <div class="input-line"><input id="adw-freeze-range" data-key="adwFreeze" type="range" min="0" max="1.5" step="0.01" value="0"><input aria-label="ADW freezing effect in per mil" data-key="adwFreeze" type="number" min="0" max="1.5" step="0.01" value="0"></div>
+            <div class="range-endpoints" aria-hidden="true"><span>0.00‰</span><span>+1.50‰</span></div>
+            <p class="control-help">ADW δ¹⁸O = −0.45‰ + this effect; ΔS = Δδ¹⁸O ÷ 0.1.</p>
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label class="control-label" for="easw-range">EASW δ¹⁸O</label><output id="easw-output" for="easw-range">0.00‰</output></div>
+            <div class="input-line"><input id="easw-range" data-key="easw" type="range" min="-1" max="2" step="0.01" value="0"><input aria-label="EASW delta 18 O in per mil" data-key="easw" type="number" min="-1" max="2" step="0.01" value="0"></div>
+            <div class="range-endpoints" aria-hidden="true"><span>−1.00‰</span><span>+2.00‰</span></div>
+            <p class="control-help">Equatorial Atlantic Surface Waters endmember.</p>
+          </div>
+        </details>
+
+        <details class="control-section" open>
+          <summary>North Atlantic surface effects</summary>
+
+          <div class="control">
+            <div class="control-head"><label class="control-label" for="evap-range">Evaporation enrichment</label><output id="evap-output" for="evap-range">+0.65‰</output></div>
+            <div class="input-line"><input id="evap-range" data-key="evap" type="range" min="0" max="1.5" step="0.01" value="0.65"><input aria-label="Evaporation enrichment in per mil" data-key="evap" type="number" min="0" max="1.5" step="0.01" value="0.65"></div>
+            <div class="range-endpoints" aria-hidden="true"><span>0.00‰</span><span>+1.50‰</span></div>
+            <p class="control-help">Raises δ¹⁸O and salinity.</p>
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label class="control-label" for="fresh-range">Freshwater fraction</label><output id="fresh-output" for="fresh-range">0%</output></div>
+            <div class="input-line"><input id="fresh-range" data-key="fresh" type="range" min="0" max="100" step="1" value="0"><input aria-label="Freshwater fraction of NASW in percent" data-key="fresh" type="number" min="0" max="100" step="1" value="0"></div>
+            <div class="range-endpoints" aria-hidden="true"><span>0%</span><span>100%</span></div>
+            <p class="control-help">Mixes freshwater (δ¹⁸O = −9.5‰, salinity = 0) with evaporated EASW.</p>
+          </div>
+        </details>
+
+        <details class="control-section" open>
+          <summary>Deep-water mixing</summary>
+
+          <div class="control">
+            <div class="control-head"><label class="control-label" for="pdw-range">PDW fraction from ADW</label><output id="pdw-output" for="pdw-range">30%</output></div>
+            <div class="input-line"><input id="pdw-range" data-key="pdwFrac" type="range" min="0" max="1" step="0.01" value="0.3"><input aria-label="Pacific Deep Waters fraction from ADW" data-key="pdwFrac" type="number" min="0" max="1" step="0.01" value="0.3"></div>
+            <div class="range-endpoints" aria-hidden="true"><span>0%</span><span>100%</span></div>
+            <p class="control-help">The remainder comes from NADW.</p>
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label class="control-label" for="idw-range">IDW fraction from ADW</label><output id="idw-output" for="idw-range">80%</output></div>
+            <div class="input-line"><input id="idw-range" data-key="idwFrac" type="range" min="0" max="1" step="0.01" value="0.8"><input aria-label="Indian Deep Waters fraction from ADW" data-key="idwFrac" type="number" min="0" max="1" step="0.01" value="0.8"></div>
+            <div class="range-endpoints" aria-hidden="true"><span>0%</span><span>100%</span></div>
+            <p class="control-help">The remainder comes from NADW.</p>
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label class="control-label" for="asw-range">ASW freezing effect</label><output id="asw-output" for="asw-range">0.00‰</output></div>
+            <div class="input-line"><input id="asw-range" data-key="aswFreeze" type="range" min="0" max="1.5" step="0.01" value="0"><input aria-label="Arctic Surface Waters freezing effect in per mil" data-key="aswFreeze" type="number" min="0" max="1.5" step="0.01" value="0"></div>
+            <div class="range-endpoints" aria-hidden="true"><span>0.00‰</span><span>+1.50‰</span></div>
+            <p class="control-help">ASW starts at NASW, then freezing enriches δ¹⁸O; ΔS = Δδ¹⁸O ÷ 0.1.</p>
+          </div>
+        </details>
+
+        <details class="control-section" open>
+          <summary>Western Interior Seaway</summary>
+
+          <div class="control">
+            <div class="control-head"><label class="control-label" for="wis-asw-range">WIS fraction from ASW</label><output id="wis-asw-output" for="wis-asw-range">0%</output></div>
+            <div class="input-line"><input id="wis-asw-range" data-key="wisAswFrac" type="range" min="0" max="1" step="0.01" value="0"><input aria-label="Western Interior Seaway fraction from Arctic Surface Waters" data-key="wisAswFrac" type="number" min="0" max="1" step="0.01" value="0"></div>
+            <div class="range-endpoints" aria-hidden="true"><span>0%</span><span>100%</span></div>
+            <p class="control-help">The remainder comes from EASW.</p>
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label class="control-label" for="wis-evap-range">WIS evaporation enrichment</label><output id="wis-evap-output" for="wis-evap-range">0.00‰</output></div>
+            <div class="input-line"><input id="wis-evap-range" data-key="wisEvap" type="range" min="0" max="1.5" step="0.01" value="0"><input aria-label="Western Interior Seaway evaporation enrichment in per mil" data-key="wisEvap" type="number" min="0" max="1.5" step="0.01" value="0"></div>
+            <div class="range-endpoints" aria-hidden="true"><span>0.00‰</span><span>+1.50‰</span></div>
+            <p class="control-help">Raises WIS δ¹⁸O and salinity.</p>
+          </div>
+
+          <div class="control">
+            <div class="control-head"><label class="control-label" for="wis-fresh-range">WIS freshwater fraction</label><output id="wis-fresh-output" for="wis-fresh-range">0%</output></div>
+            <div class="input-line"><input id="wis-fresh-range" data-key="wisFresh" type="range" min="0" max="100" step="1" value="0"><input aria-label="Western Interior Seaway freshwater fraction in percent" data-key="wisFresh" type="number" min="0" max="100" step="1" value="0"></div>
+            <div class="range-endpoints" aria-hidden="true"><span>0%</span><span>100%</span></div>
+            <p class="control-help">Mixes the WIS water with freshwater (δ¹⁸O = −9.5‰, salinity = 0).</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="chart-shell" aria-labelledby="chart-title">
+        <div class="chart-head">
+          <div>
+            <h2 id="chart-title">Predicted ocean-region compositions</h2>
+            <p>Salinity on x; δ¹⁸O on y. White line is a fixed reference from (15, −12) to (38, 2).</p>
+          </div>
+          <div class="legend" aria-label="Point categories">
+            <span><i class="dot input"></i>inputs</span>
+            <span><i class="dot derived"></i>surface / derived</span>
+            <span><i class="dot mix"></i>deep-water mixes</span>
+            <span><i class="dot wis"></i>WIS</span>
+          </div>
+        </div>
+        <fieldset class="axis-controls">
+          <legend>Axis limits</legend>
+          <div class="axis-grid">
+            <div class="axis-control">
+              <div class="control-head"><label class="control-label" for="x-min-range">X minimum</label></div>
+              <div class="input-line"><input id="x-min-range" data-axis="xMin" type="range" min="0" max="45" step="0.1" value="32"><input id="x-min-number" aria-label="X-axis minimum" data-axis="xMin" type="number" min="0" max="45" step="0.1" value="32"></div>
+              <div class="range-endpoints" aria-hidden="true"><span>0</span><span>45</span></div>
+            </div>
+            <div class="axis-control">
+              <div class="control-head"><label class="control-label" for="x-max-range">X maximum</label></div>
+              <div class="input-line"><input id="x-max-range" data-axis="xMax" type="range" min="0" max="45" step="0.1" value="40"><input id="x-max-number" aria-label="X-axis maximum" data-axis="xMax" type="number" min="0" max="45" step="0.1" value="40"></div>
+              <div class="range-endpoints" aria-hidden="true"><span>0</span><span>45</span></div>
+            </div>
+            <div class="axis-control">
+              <div class="control-head"><label class="control-label" for="y-min-range">Y minimum</label></div>
+              <div class="input-line"><input id="y-min-range" data-axis="yMin" type="range" min="-15" max="15" step="0.1" value="-2"><input id="y-min-number" aria-label="Y-axis minimum" data-axis="yMin" type="number" min="-15" max="15" step="0.1" value="-2"></div>
+              <div class="range-endpoints" aria-hidden="true"><span>−15</span><span>+15</span></div>
+            </div>
+            <div class="axis-control">
+              <div class="control-head"><label class="control-label" for="y-max-range">Y maximum</label></div>
+              <div class="input-line"><input id="y-max-range" data-axis="yMax" type="range" min="-15" max="15" step="0.1" value="2"><input id="y-max-number" aria-label="Y-axis maximum" data-axis="yMax" type="number" min="-15" max="15" step="0.1" value="2"></div>
+              <div class="range-endpoints" aria-hidden="true"><span>−15</span><span>+15</span></div>
+            </div>
+          </div>
+        </fieldset>
+        <div class="plot-wrap">
+          <svg id="chart" role="img" aria-labelledby="chart-title chart-desc" viewBox="0 0 900 580" preserveAspectRatio="xMidYMid meet">
+            <desc id="chart-desc">A salinity versus delta 18 O chart with points for ADW, EASW, NASW, NADW, PDW, IDW, ASW, and WIS, plus a fixed white reference line from salinity 15 and delta 18 O minus 12 to salinity 38 and delta 18 O plus 2.</desc>
+          </svg>
+          <div id="tooltip" class="tooltip" role="tooltip"></div>
+        </div>
+        <p class="plot-note">Conceptual teaching model: salinity responses use simple linked effects so the chart emphasizes mixing relationships, not a calibrated oceanographic reconstruction.</p>
+        <div class="selection" id="selection" aria-live="polite">Select a point to inspect its calculation.</div>
+        <fieldset class="marker-controls">
+          <legend>Show ocean-region markers</legend>
+          <div class="marker-options">
+            <label class="marker-option"><input type="checkbox" data-region="ADW" checked> ADW</label>
+            <label class="marker-option"><input type="checkbox" data-region="EASW" checked> EASW</label>
+            <label class="marker-option"><input type="checkbox" data-region="NASW" checked> NASW</label>
+            <label class="marker-option"><input type="checkbox" data-region="NADW" checked> NADW</label>
+            <label class="marker-option"><input type="checkbox" data-region="PDW" checked> PDW</label>
+            <label class="marker-option"><input type="checkbox" data-region="IDW" checked> IDW</label>
+            <label class="marker-option"><input type="checkbox" data-region="ASW" checked> ASW</label>
+            <label class="marker-option"><input type="checkbox" data-region="WIS" checked> WIS</label>
+          </div>
+        </fieldset>
+      </section>
+
+      <section class="table-shell" aria-labelledby="table-title">
+        <h2 id="table-title">Current values</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Region</th><th>Role</th><th class="num">Salinity (‰)</th><th class="num">δ¹⁸O (‰)</th><th>Calculation</th></tr></thead>
+            <tbody id="value-rows"></tbody>
+          </table>
+        </div>
+        <p class="method">Defaults: ADW = −0.45‰ and salinity 33.5; EASW = 0.00‰ and salinity 34.5; NASW uses 0% freshwater after evaporation; WIS δ¹⁸O initially equals EASW − 1.00‰ for non-ice-sheet conditions.</p>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      const defaults = { adwFreeze: 0, easw: 0, evap: 0.65, fresh: 0, pdwFrac: 0.3, idwFrac: 0.8, aswFreeze: 0, wisAswFrac: 0, wisEvap: 0, wisFresh: 0 };
+      const state = { ...defaults };
+      const axes = { xMin: 32, xMax: 40, yMin: -2, yMax: 2 };
+      const visibility = { ADW: true, EASW: true, NASW: true, NADW: true, PDW: true, IDW: true, ASW: true, WIS: true };
+      const salinityPerDelta = 1 / 0.1;
+      const wisDeltaOffset = -1;
+      const freshwaterDelta = -9.5;
+      const freshwaterSalinity = 0;
+      const chart = document.getElementById('chart');
+      const tooltip = document.getElementById('tooltip');
+      const selection = document.getElementById('selection');
+      const rows = document.getElementById('value-rows');
+      const ns = 'http://www.w3.org/2000/svg';
+      const colors = { input: 'input', derived: 'derived', mix: 'mix', surface: 'surface', wis: 'wis' };
+
+      const fmt = (value, digits = 2) => `${value >= 0 ? '+' : ''}${value.toFixed(digits)}‰`;
+      const salFmt = value => value.toFixed(2);
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
+      function mix(a, b, fractionA, label, calculation) {
+        return { name: label, role: 'deep-water mix', kind: 'mix', delta: a.delta * fractionA + b.delta * (1 - fractionA), sal: a.sal * fractionA + b.sal * (1 - fractionA), calculation };
+      }
+
+      function calculate() {
+        const adw = { name: 'ADW', role: 'input water', kind: 'input', delta: -0.45 + state.adwFreeze, sal: 33.5 + state.adwFreeze * salinityPerDelta, calculation: `−0.45 + ${state.adwFreeze.toFixed(2)} freezing` };
+        const easw = { name: 'EASW', role: 'input water', kind: 'input', delta: state.easw, sal: 34.5, calculation: 'user input' };
+        const evapDelta = easw.delta + state.evap;
+        const evapSal = easw.sal + state.evap * 1.5;
+        const freshFraction = state.fresh / 100;
+        const nasw = { name: 'NASW', role: 'surface water', kind: 'surface', delta: evapDelta * (1 - freshFraction) + freshwaterDelta * freshFraction, sal: evapSal * (1 - freshFraction) + freshwaterSalinity * freshFraction, calculation: `${Math.round((1 - freshFraction) * 100)}% evaporated EASW + ${Math.round(freshFraction * 100)}% freshwater` };
+        const nadw = { name: 'NADW', role: 'derived deep water', kind: 'derived', delta: nasw.delta, sal: nasw.sal, calculation: 'equal to NASW' };
+        const pdw = mix(adw, nadw, state.pdwFrac, 'PDW', `${Math.round(state.pdwFrac * 100)}% ADW + ${Math.round((1 - state.pdwFrac) * 100)}% NADW`);
+        const idw = mix(adw, nadw, state.idwFrac, 'IDW', `${Math.round(state.idwFrac * 100)}% ADW + ${Math.round((1 - state.idwFrac) * 100)}% NADW`);
+        const asw = { name: 'ASW', role: 'surface water', kind: 'surface', delta: nasw.delta + state.aswFreeze, sal: nasw.sal + state.aswFreeze * salinityPerDelta, calculation: `NASW + ${state.aswFreeze.toFixed(2)} freezing` };
+        const wisMixDelta = easw.delta * (1 - state.wisAswFrac) + asw.delta * state.wisAswFrac + state.wisEvap;
+        const wisMixSal = easw.sal * (1 - state.wisAswFrac) + asw.sal * state.wisAswFrac + state.wisEvap * 1.5;
+        const wisFreshFraction = state.wisFresh / 100;
+        const wis = { name: 'WIS', role: 'derived inland sea', kind: 'wis', delta: wisMixDelta * (1 - wisFreshFraction) + freshwaterDelta * wisFreshFraction + wisDeltaOffset, sal: wisMixSal * (1 - wisFreshFraction) + freshwaterSalinity * wisFreshFraction, calculation: `${Math.round((1 - state.wisAswFrac) * 100)}% EASW + ${Math.round(state.wisAswFrac * 100)}% ASW + evap ${fmt(state.wisEvap)} + ${Math.round(wisFreshFraction * 100)}% freshwater − 1.00‰ non-ice-sheet offset` };
+        return [adw, easw, nasw, nadw, pdw, idw, asw, wis];
+      }
+
+      function setText(id, text) { document.getElementById(id).textContent = text; }
+      function updateReadouts() {
+        setText('adw-freeze-output', fmt(state.adwFreeze));
+        setText('easw-output', fmt(state.easw));
+        setText('evap-output', fmt(state.evap));
+        setText('fresh-output', `${Math.round(state.fresh)}%`);
+        setText('pdw-output', `${Math.round(state.pdwFrac * 100)}%`);
+        setText('idw-output', `${Math.round(state.idwFrac * 100)}%`);
+        setText('asw-output', fmt(state.aswFreeze));
+        setText('wis-asw-output', `${Math.round(state.wisAswFrac * 100)}%`);
+        setText('wis-evap-output', fmt(state.wisEvap));
+        setText('wis-fresh-output', `${Math.round(state.wisFresh)}%`);
+        document.querySelectorAll('input[data-key]').forEach(input => {
+          const value = state[input.dataset.key];
+          if (document.activeElement !== input) input.value = value;
+        });
+      }
+
+      function svgEl(tag, attrs = {}) {
+        const node = document.createElementNS(ns, tag);
+        Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+        return node;
+      }
+
+      function renderChart(regions) {
+        chart.querySelectorAll('.generated').forEach(node => node.remove());
+        const width = 900, height = 580;
+        const margin = { top: 36, right: 70, bottom: 68, left: 74 };
+        const plot = { x: margin.left, y: margin.top, w: width - margin.left - margin.right, h: height - margin.top - margin.bottom };
+        const { xMin, xMax, yMin, yMax } = axes;
+        const x = value => plot.x + (value - xMin) / (xMax - xMin) * plot.w;
+        const y = value => plot.y + (yMax - value) / (yMax - yMin) * plot.h;
+        const group = svgEl('g', { class: 'generated' });
+        chart.appendChild(group);
+        const clip = svgEl('clipPath', { id: 'chart-clip' });
+        clip.appendChild(svgEl('rect', { x: plot.x, y: plot.y, width: plot.w, height: plot.h }));
+        group.appendChild(clip);
+        const tickCount = 5;
+        const xStep = (xMax - xMin) / tickCount;
+        const yStep = (yMax - yMin) / tickCount;
+        for (let i = 0; i <= tickCount; i++) {
+          const xv = xMin + i * xStep, px = x(xv);
+          group.appendChild(svgEl('line', { x1: px, y1: plot.y, x2: px, y2: plot.y + plot.h, class: 'chart-grid' }));
+          const tx = svgEl('text', { x: px, y: plot.y + plot.h + 25, 'text-anchor': 'middle', class: 'chart-tick' }); tx.textContent = xv.toFixed(1); group.appendChild(tx);
+          const yv = yMin + i * yStep, py = y(yv);
+          group.appendChild(svgEl('line', { x1: plot.x, y1: py, x2: plot.x + plot.w, y2: py, class: 'chart-grid' }));
+          const ty = svgEl('text', { x: plot.x - 13, y: py + 4, 'text-anchor': 'end', class: 'chart-tick' }); ty.textContent = yv.toFixed(1); group.appendChild(ty);
+        }
+        group.appendChild(svgEl('line', { x1: plot.x, y1: plot.y + plot.h, x2: plot.x + plot.w, y2: plot.y + plot.h, class: 'chart-axis' }));
+        group.appendChild(svgEl('line', { x1: plot.x, y1: plot.y, x2: plot.x, y2: plot.y + plot.h, class: 'chart-axis' }));
+        const xTitle = svgEl('text', { x: plot.x + plot.w / 2, y: height - 17, 'text-anchor': 'middle', class: 'chart-axis-title' }); xTitle.textContent = 'Salinity (‰)'; group.appendChild(xTitle);
+        const yTitle = svgEl('text', { x: 20, y: plot.y + plot.h / 2, transform: `rotate(-90 20 ${plot.y + plot.h / 2})`, 'text-anchor': 'middle', class: 'chart-axis-title' }); yTitle.textContent = 'δ¹⁸O (‰ vs SMOW)'; group.appendChild(yTitle);
+
+        group.appendChild(svgEl('line', { x1: x(15), y1: y(-12), x2: x(38), y2: y(2), class: 'reference-line', 'clip-path': 'url(#chart-clip)' }));
+        const labelOffsets = { ADW: [-42, 22], EASW: [10, -13], NASW: [10, 19], NADW: [10, -15], PDW: [10, 18], IDW: [10, -13], ASW: [-38, -13], WIS: [10, -28] };
+        regions.filter(region => visibility[region.name]).forEach(region => {
+          const cx = x(region.sal), cy = y(region.delta);
+          const circle = svgEl('circle', { cx, cy, r: 8, class: `point ${colors[region.kind]}`, tabindex: '0', role: 'button', 'aria-label': `${region.name}: salinity ${salFmt(region.sal)} per mil, delta 18 O ${fmt(region.delta)}` });
+          circle.addEventListener('mouseenter', event => showTooltip(event, region));
+          circle.addEventListener('mouseleave', hideTooltip);
+          circle.addEventListener('focus', event => showTooltip(event, region));
+          circle.addEventListener('blur', hideTooltip);
+          circle.addEventListener('click', () => selectRegion(region));
+          group.appendChild(circle);
+          const offset = labelOffsets[region.name];
+          const label = svgEl('text', { x: cx + offset[0], y: cy + offset[1], class: 'region-label' }); label.textContent = region.name; group.appendChild(label);
+        });
+      }
+
+      function showTooltip(event, region) {
+        const box = document.querySelector('.plot-wrap').getBoundingClientRect();
+        const point = event.target.getBoundingClientRect();
+        tooltip.innerHTML = `<strong>${region.name}</strong><span>Salinity: ${salFmt(region.sal)}‰</span><br><span>δ¹⁸O: ${fmt(region.delta)}</span>`;
+        tooltip.style.left = `${Math.min(point.left - box.left + 14, box.width - 210)}px`;
+        tooltip.style.top = `${Math.max(8, point.top - box.top - 76)}px`;
+        tooltip.classList.add('visible');
+      }
+
+      function hideTooltip() { tooltip.classList.remove('visible'); }
+      function selectRegion(region) { selection.innerHTML = `<strong>${region.name}</strong> · ${salFmt(region.sal)}‰ salinity · ${fmt(region.delta)} δ¹⁸O · ${region.calculation}`; }
+
+      function renderTable(regions) {
+        rows.innerHTML = regions.map(region => `<tr><td><span class="swatch ${colors[region.kind]}"></span>${region.name}</td><td>${region.role}</td><td class="num">${salFmt(region.sal)}</td><td class="num">${fmt(region.delta)}</td><td>${region.calculation}</td></tr>`).join('');
+      }
+
+      function render() {
+        updateReadouts();
+        const regions = calculate();
+        renderChart(regions);
+        renderTable(regions);
+      }
+
+      function syncAxisInputs() {
+        document.querySelectorAll('input[data-axis]').forEach(input => {
+          input.value = axes[input.dataset.axis];
+        });
+      }
+
+      function updateAxis(key, value) {
+        const gap = 0.1;
+        if (!Number.isFinite(value)) return;
+        if (key === 'xMin') axes.xMin = Math.min(clamp(value, 0, 45), axes.xMax - gap);
+        if (key === 'xMax') axes.xMax = Math.max(clamp(value, 0, 45), axes.xMin + gap);
+        if (key === 'yMin') axes.yMin = Math.min(clamp(value, -15, 15), axes.yMax - gap);
+        if (key === 'yMax') axes.yMax = Math.max(clamp(value, -15, 15), axes.yMin + gap);
+        syncAxisInputs();
+        render();
+      }
+
+      document.getElementById('reset-defaults').addEventListener('click', () => {
+        Object.assign(state, defaults);
+        render();
+      });
+
+      document.querySelectorAll('input[data-key]').forEach(input => {
+        input.addEventListener('input', event => {
+          const key = event.target.dataset.key;
+          const min = Number(event.target.min), max = Number(event.target.max);
+          state[key] = clamp(Number(event.target.value), min, max);
+          render();
+        });
+      });
+
+      document.querySelectorAll('input[data-region]').forEach(input => {
+        input.addEventListener('change', event => {
+          visibility[event.target.dataset.region] = event.target.checked;
+          render();
+        });
+      });
+
+      document.querySelectorAll('input[data-axis]').forEach(input => {
+        input.addEventListener('input', event => updateAxis(event.target.dataset.axis, Number(event.target.value)));
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
